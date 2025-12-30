@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>観戦記録</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f6f7f8;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 420px;
+      margin: auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-top: 12px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #1971c2;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .games {
+      margin-top: 16px;
+    }
+    .game {
+      background: #f1f3f5;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .teams {
+      font-weight: bold;
+    }
+    .stadium {
+      font-size: 13px;
+      color: #666;
+    }
+    .note {
+      font-size: 12px;
+      color: #888;
+      margin-top: 12px;
+    }
+    .records {
+      margin-top: 20px;
+      font-size: 13px;
+    }
+    .record {
+      border-top: 1px solid #eee;
+      padding: 6px 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>観戦記録</h1>
+
+  <label>
+    観戦日
+    <input type="date" id="date">
+  </label>
+
+  <div class="games" id="games"></div>
+
+  <label>
+    対戦カード
+    <input type="text" id="card">
+  </label>
+
+  <label>
+    球場
+    <input type="text" id="stadium">
+  </label>
+
+  <button id="save">保存</button>
+
+  <p class="note">
+    ※自動取得はNPB公式戦のみ（Yahoo!スポーツ非公式データ）
+  </p>
+
+  <div class="records" id="records"></div>
+</div>
+
+<script>
+const dateInput = document.getElementById("date");
+const gamesDiv = document.getElementById("games");
+const cardInput = document.getElementById("card");
+const stadiumInput = document.getElementById("stadium");
+const recordsDiv = document.getElementById("records");
+
+/* ---------- Yahoo内部APIから取得 ---------- */
+async function loadGames(date) {
+  const ymd = date.replaceAll("-", "");
+  const url =
+    `https://internal-api.sports.yahoo.co.jp/v1/baseball/npb/games?date=${ymd}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  return data.games
+    .filter(g => g.gameType === "R") // 公式戦のみ
+    .map(g => ({
+      card: `${g.homeTeam.name} vs ${g.awayTeam.name}`,
+      stadium: g.stadium.name
+    }));
+}
+
+/* ---------- 日付変更時 ---------- */
+dateInput.addEventListener("change", async () => {
+  gamesDiv.innerHTML = "";
+  cardInput.value = "";
+  stadiumInput.value = "";
+
+  try {
+    const games = await loadGames(dateInput.value);
+    if (!games.length) return;
+
+    games.forEach(game => {
+      const div = document.createElement("div");
+      div.className = "game";
+      div.innerHTML = `
+        <div class="teams">${game.card}</div>
+        <div class="stadium">${game.stadium}</div>
+      `;
+      div.onclick = () => {
+        cardInput.value = game.card;
+        stadiumInput.value = game.stadium;
+      };
+      gamesDiv.appendChild(div);
+    });
+  } catch {
+    gamesDiv.innerHTML =
+      "<p class='note'>自動取得できませんでした</p>";
+  }
+});
+
+/* ---------- 保存 ---------- */
+document.getElementById("save").onclick = () => {
+  if (!dateInput.value || !cardInput.value) return;
+
+  const record = {
+    date: dateInput.value,
+    card: cardInput.value,
+    stadium: stadiumInput.value
+  };
+
+  const records =
+    JSON.parse(localStorage.getItem("records") || "[]");
+
+  records.push(record);
+  localStorage.setItem("records", JSON.stringify(records));
+
+  renderRecords();
+};
+
+/* ---------- 表示 ---------- */
+function renderRecords() {
+  const records =
+    JSON.parse(localStorage.getItem("records") || "[]");
+
+  recordsDiv.innerHTML = "<h3>観戦履歴</h3>";
+  records.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "record";
+    div.textContent = `${r.date}｜${r.card}｜${r.stadium}`;
+    recordsDiv.appendChild(div);
+  });
+}
+
+renderRecords();
+</script>
+
+</body>
+</html>
